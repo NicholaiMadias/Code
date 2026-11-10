@@ -1,2 +1,2 @@
-# AI-University-Java
-Modern Java rebuild of the AI-University presentation starter
+# LMS Arcade 
+Modern AI-University presentation starter with Arcade, Labs and Firebase 
