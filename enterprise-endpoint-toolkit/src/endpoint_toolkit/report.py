@@ -19,10 +19,16 @@ def write_reports(rows: list[dict[str, Any]], summary: dict[str, int],
     json_path = target / "report.json"
     json_path.write_text(json.dumps(metadata, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     csv_path = target / "inventory.csv"
+    def safe_csv(value: Any) -> str:
+        # Prevent spreadsheet formula injection when opening an untrusted device inventory.
+        raw = "" if value is None else str(value)
+        if raw.startswith(("=", "+", "-", "@", "\t", "\r", "\n")):
+            return "'" + raw
+        return raw
     with csv_path.open("w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDS, extrasaction="ignore")
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows({key: safe_csv(row.get(key)) for key in FIELDS} for row in rows)
     def cell(value: Any) -> str:
         return html.escape("" if value is None else str(value), quote=True)
     trs = "\n".join("<tr>" + "".join(f"<td>{cell(row.get(f))}</td>" for f in FIELDS) + "</tr>" for row in rows)

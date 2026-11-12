@@ -3,21 +3,29 @@ from __future__ import annotations
 
 import json
 from urllib.parse import urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import Request, HTTPRedirectHandler, build_opener
 from typing import Any, Callable
 
 GRAPH_START = "https://graph.microsoft.com/v1.0/deviceManagement/managedDevices"
+
+class _BlockRedirect(HTTPRedirectHandler):
+    def redirect_request(self, request, fp, code, msg, headers, newurl):
+        raise ValueError("API redirects are not permitted")
+
+def _safe_open(request, timeout=20):
+    # urllib's default redirect handling could forward credentials to another host.
+    return build_opener(_BlockRedirect()).open(request, timeout=timeout)
 
 def _validated_endpoint(url: str, host: str, prefix: str) -> None:
     parsed = urlsplit(url)
     if (parsed.scheme != "https" or parsed.hostname != host or parsed.username
             or parsed.password or parsed.port is not None
-            or not parsed.path.startswith(prefix)):
+            or parsed.path != prefix):
         raise ValueError("API URL must stay on the approved HTTPS endpoint")
 
 def _get_json(url: str, token: str, *, host: str, prefix: str,
               headers: dict[str, str] | None = None,
-              opener: Callable[..., Any] = urlopen) -> dict[str, Any]:
+              opener: Callable[..., Any] = _safe_open) -> dict[str, Any]:
     _validated_endpoint(url, host, prefix)
     if not token.strip():
         raise ValueError("access token is required")
@@ -33,7 +41,7 @@ def _get_json(url: str, token: str, *, host: str, prefix: str,
     return result
 
 def graph_managed_devices(token: str, *, max_pages: int = 20,
-                          opener: Callable[..., Any] = urlopen) -> list[dict[str, Any]]:
+                          opener: Callable[..., Any] = _safe_open) -> list[dict[str, Any]]:
     """Use stable Microsoft Graph v1.0, with host-restricted nextLink paging."""
     if not 1 <= max_pages <= 100:
         raise ValueError("max_pages must be between 1 and 100")
@@ -58,7 +66,7 @@ def graph_managed_devices(token: str, *, max_pages: int = 20,
     return devices
 
 def workspace_one_devices(base_url: str, token: str, *, tenant_code: str = "",
-                          opener: Callable[..., Any] = urlopen) -> list[dict[str, Any]]:
+                          opener: Callable[..., Any] = _safe_open) -> list[dict[str, Any]]:
     """Fetch one read-only UEM search page. Inspect the tenant's API/help for paging."""
     parsed = urlsplit(base_url.rstrip("/"))
     if (parsed.scheme != "https" or not parsed.hostname or parsed.username or
@@ -77,4 +85,7 @@ def workspace_one_devices(base_url: str, token: str, *, tenant_code: str = "",
         total = page.get("Total", page.get("TotalRecords", page.get("total")))
         if isinstance(total, int) and total > len(values):
             raise ValueError("Workspace ONE returned a partial page; configure tenant-specific paging")
+        pages = page.get("PageCount", page.get("pageCount", 1))
+        if isinstance(pages, int) and pages > 1:
+            raise ValueError("Workspace ONE returned multiple pages; configure tenant-specific paging")
     return values

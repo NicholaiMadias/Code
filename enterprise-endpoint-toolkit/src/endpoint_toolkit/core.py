@@ -1,7 +1,7 @@
 """Normalize endpoint records and produce an honest read-only risk summary."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 def _first(record: dict[str, Any], *keys: str) -> Any:
@@ -45,7 +45,7 @@ def analyze_devices(devices: list[dict[str, Any]], *, stale_days: int = 30,
             compliance = "unknown"
         sync_raw = _first(device, "lastSyncDateTime", "LastSeen", "lastSeen", "LastSyncDateTime")
         synced = _as_utc(sync_raw)
-        if synced is None:
+        if synced is None or synced > current + timedelta(days=1):
             freshness = "unknown"
         elif (current - synced).total_seconds() > stale_days * 86400:
             freshness = "stale"

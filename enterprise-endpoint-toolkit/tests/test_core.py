@@ -36,6 +36,17 @@ class CoreTests(unittest.TestCase):
             self.assertIn("&lt;script&gt;", doc)
             self.assertIn("&lt;demo&gt;", doc)
 
+    def test_future_clock_unknown(self):
+        rows = analyze_devices([{"complianceState": "compliant", "lastSyncDateTime": "2099-01-01T00:00:00Z"}], now=NOW)
+        self.assertEqual(rows[0]["risk"], "unknown")
+
+    def test_csv_formula_escaping(self):
+        rows = analyze_devices([{"deviceName": "=HYPERLINK(\"http://bad.example\")"}], now=NOW)
+        with TemporaryDirectory() as directory:
+            write_reports(rows, summarize(rows), directory, source="test")
+            csv_content = (Path(directory) / "inventory.csv").read_text()
+            self.assertIn("'=HYPERLINK(", csv_content)
+
     def test_reject_naive_clock(self):
         with self.assertRaises(ValueError):
             analyze_devices([], now=datetime(2026, 11, 11))

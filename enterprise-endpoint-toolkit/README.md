@@ -54,9 +54,8 @@ Tokens are read from environment variables and are not stored or displayed by th
 
 ```powershell
 Import-Module ./powershell/EndpointToolkit.psm1 -Force
-Get-EndpointComplianceAudit -Device @(
-  [pscustomobject]@{ deviceName='LAB-01'; complianceState='noncompliant'; lastSyncDateTime='2025-01-01T00:00:00Z' }
-)
+[pscustomobject]@{ deviceName='LAB-01'; complianceState='noncompliant'; lastSyncDateTime='2025-01-01T00:00:00Z' } |
+  Get-EndpointComplianceAudit
 # Example local Workspace ONE sensor (Windows only):
 ./powershell/Sensors/Get-ChromeVersion.ps1
 ```

@@ -1,5 +1,5 @@
 [
-  {"id": "lab-001", "deviceName": "LAB-WIN-01", "operatingSystem": "Windows", "complianceState": "compliant", "lastSyncDateTime": "2099-01-01T00:00:00Z"},
+  {"id": "lab-001", "deviceName": "LAB-WIN-01", "operatingSystem": "Windows", "complianceState": "compliant", "lastSyncDateTime": "2026-11-10T00:00:00Z"},
   {"id": "lab-002", "deviceName": "LAB-MAC-02", "operatingSystem": "macOS", "complianceState": "noncompliant", "lastSyncDateTime": "2023-01-01T00:00:00Z"},
   {"id": "lab-003", "deviceName": "LAB-IOS-03", "operatingSystem": "iOS", "complianceState": "unknown"}
 ]
