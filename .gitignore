@@ -1,3 +1,38 @@
-bin/
-obj/
+# ------------------------------
+#  Secrets & Credentials
+# ------------------------------
+# Service‑account keys (any location)
+service_account.json
+backend/service_account.json
+*.json   # be careful: keep this line if you have other JSON data you *do* want versioned;
+         # you can narrow it to a specific pattern, e.g. `*-service-account.json`
+
+# Environment files (dotenv)
+.env
+.env.*
+!.env.example   # keep a template for developers, but never commit real values
+
+# Any other credential files you might add later
+*.key
+*.pem
+
+# ------------------------------
+#  Local logs & temporary output
+# ------------------------------
+firestore-debug.log
+*.log
+
+# Node / Next.js build artefacts (already typically present)
 node_modules/
+.next/
+out/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Miscellaneous
+*.mp4
+*.DS_Store
+.idea/
+.vscode/
