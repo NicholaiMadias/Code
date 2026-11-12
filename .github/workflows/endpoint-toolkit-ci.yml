@@ -1,0 +1,70 @@
+name: Enterprise Endpoint Toolkit CI
+on:
+  push:
+    paths:
+      - "enterprise-endpoint-toolkit/**"
+      - ".github/workflows/endpoint-toolkit-ci.yml"
+  pull_request:
+    paths:
+      - "enterprise-endpoint-toolkit/**"
+      - ".github/workflows/endpoint-toolkit-ci.yml"
+permissions:
+  contents: read
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install package
+        run: python -m pip install ./enterprise-endpoint-toolkit
+      - name: Unit tests
+        run: python -m unittest discover -s enterprise-endpoint-toolkit/tests -p "test_*.py" -v
+      - name: Demo report smoke test
+        run: |
+          endpoint-toolkit demo --out /tmp/endpoint-report
+          test -s /tmp/endpoint-report/dashboard.html
+          test -s /tmp/endpoint-report/report.json
+  powershell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Pester 5.7.1 from NuGet and test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = '5.7.1'
+          # The Pester GitHub release has no attached binaries. Fetch the prebuilt
+          # NuGet package directly instead of using PSGallery/PowerShellGet.
+          $url = "https://api.nuget.org/v3-flatcontainer/pester/$version/pester.$version.nupkg"
+          $zip = Join-Path $env:RUNNER_TEMP "Pester-$version.zip"
+          $extract = Join-Path $env:RUNNER_TEMP 'pester-extracted'
+          Invoke-WebRequest -Uri $url -OutFile $zip -ErrorAction Stop
+          Write-Host "Downloaded Pester package SHA256: $((Get-FileHash -Path $zip -Algorithm SHA256).Hash)"
+          Expand-Archive -Path $zip -DestinationPath $extract -Force
+
+          $manifests = @(Get-ChildItem -Path $extract -Recurse -File -Filter 'Pester.psd1')
+          if ($manifests.Count -ne 1) {
+            throw "Expected one packaged Pester.psd1, found $($manifests.Count)."
+          }
+          $source = $manifests[0].Directory.FullName
+          foreach ($file in @('Pester.psd1', 'Pester.psm1')) {
+            if (-not (Test-Path (Join-Path $source $file) -PathType Leaf)) {
+              throw "Downloaded package is missing $file."
+            }
+          }
+          $target = Join-Path $HOME ".local/share/powershell/Modules/Pester/$version"
+          New-Item -ItemType Directory -Path $target -Force | Out-Null
+          Copy-Item -Path (Join-Path $source '*') -Destination $target -Recurse -Force
+
+          $module = Import-Module (Join-Path $target 'Pester.psd1') -Force -PassThru -ErrorAction Stop
+          if ($module.Version -ne [version]$version) {
+            throw "Expected Pester $version, loaded $($module.Version)."
+          }
+          Write-Host "Loaded Pester $($module.Version) from $($module.ModuleBase)"
+          Invoke-Pester ./enterprise-endpoint-toolkit/tests/EndpointToolkit.Tests.ps1 -CI

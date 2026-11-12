@@ -14,3 +14,9 @@ Five small reference implementations share the same behavior across Python, Java
 | TypeScript | `npx tsx toolbox/toolbox.ts hello` | `npx tsx arcade/arcade.ts` |
 
 The five primary ports keep the same command-line contract so they can be used as small learning exercises in the Nexus LMS and Toolbox. They do not need API keys, hosted services, or network access.
+
+## Enterprise Endpoint Automation Toolkit
+
+New portfolio project: [Enterprise Endpoint Automation Toolkit](enterprise-endpoint-toolkit/README.md) — a read-only Python and PowerShell endpoint compliance audit with optional Intune/Workspace ONE inventory connectors, JSON/CSV/HTML reports, and GitHub Actions tests. Start with `endpoint-toolkit demo` to run without credentials.
+
+The existing Nexus Toolbox and Arcade reference programs above remain unchanged.
