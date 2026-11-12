@@ -37,6 +37,24 @@ jobs:
       - name: Install Pester and test
         shell: pwsh
         run: |
-          Install-Module Pester -MinimumVersion 5.5.0 -Scope CurrentUser -Force -SkipPublisherCheck
-          Import-Module Pester -MinimumVersion 5.5.0
+          $ErrorActionPreference = 'Stop'
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+          # Explicitly initialize PSGallery when missing, and show repository diagnostics.
+          if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
+            Register-PSRepository -Default
+          }
+          Get-PSRepository | Format-Table -AutoSize
+
+          # PowerShellGet on some runners needs the NuGet provider bootstrapped.
+          if (-not (Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue)) {
+            Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Scope CurrentUser -Force
+          }
+
+          Install-Module -Name Pester -MinimumVersion 5.5.0 -Repository PSGallery -Scope CurrentUser -Force -SkipPublisherCheck -ErrorAction Stop
+          Import-Module -Name Pester -MinimumVersion 5.5.0 -ErrorAction Stop
+          $installed = Get-Module Pester
+          if ($installed.Version -lt [version]'5.5.0') {
+            throw "Pester version 5.5.0 or newer is required; loaded $($installed.Version)"
+          }
           Invoke-Pester ./enterprise-endpoint-toolkit/tests/EndpointToolkit.Tests.ps1 -CI
