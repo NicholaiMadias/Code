@@ -34,27 +34,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install Pester and test
+      - name: Install Pester 5.7.1 from NuGet and test
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          $version = '5.7.1'
+          # The Pester GitHub release has no attached binaries. Fetch the prebuilt
+          # NuGet package directly instead of using PSGallery/PowerShellGet.
+          $url = "https://api.nuget.org/v3-flatcontainer/pester/$version/pester.$version.nupkg"
+          $zip = Join-Path $env:RUNNER_TEMP "Pester-$version.zip"
+          $extract = Join-Path $env:RUNNER_TEMP 'pester-extracted'
+          Invoke-WebRequest -Uri $url -OutFile $zip -ErrorAction Stop
+          Write-Host "Downloaded Pester package SHA256: $((Get-FileHash -Path $zip -Algorithm SHA256).Hash)"
+          Expand-Archive -Path $zip -DestinationPath $extract -Force
 
-          # Explicitly initialize PSGallery when missing, and show repository diagnostics.
-          if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
-            Register-PSRepository -Default
+          $manifests = @(Get-ChildItem -Path $extract -Recurse -File -Filter 'Pester.psd1')
+          if ($manifests.Count -ne 1) {
+            throw "Expected one packaged Pester.psd1, found $($manifests.Count)."
           }
-          Get-PSRepository | Format-Table -AutoSize
+          $source = $manifests[0].Directory.FullName
+          foreach ($file in @('Pester.psd1', 'Pester.psm1')) {
+            if (-not (Test-Path (Join-Path $source $file) -PathType Leaf)) {
+              throw "Downloaded package is missing $file."
+            }
+          }
+          $target = Join-Path $HOME ".local/share/powershell/Modules/Pester/$version"
+          New-Item -ItemType Directory -Path $target -Force | Out-Null
+          Copy-Item -Path (Join-Path $source '*') -Destination $target -Recurse -Force
 
-          # PowerShellGet on some runners needs the NuGet provider bootstrapped.
-          if (-not (Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue)) {
-            Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Scope CurrentUser -Force
+          $module = Import-Module (Join-Path $target 'Pester.psd1') -Force -PassThru -ErrorAction Stop
+          if ($module.Version -ne [version]$version) {
+            throw "Expected Pester $version, loaded $($module.Version)."
           }
-
-          Install-Module -Name Pester -MinimumVersion 5.5.0 -Repository PSGallery -Scope CurrentUser -Force -SkipPublisherCheck -ErrorAction Stop
-          Import-Module -Name Pester -MinimumVersion 5.5.0 -ErrorAction Stop
-          $installed = Get-Module Pester
-          if ($installed.Version -lt [version]'5.5.0') {
-            throw "Pester version 5.5.0 or newer is required; loaded $($installed.Version)"
-          }
+          Write-Host "Loaded Pester $($module.Version) from $($module.ModuleBase)"
           Invoke-Pester ./enterprise-endpoint-toolkit/tests/EndpointToolkit.Tests.ps1 -CI
