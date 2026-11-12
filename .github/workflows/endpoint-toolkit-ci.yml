@@ -1,0 +1,42 @@
+name: Enterprise Endpoint Toolkit CI
+on:
+  push:
+    paths:
+      - "enterprise-endpoint-toolkit/**"
+      - ".github/workflows/endpoint-toolkit-ci.yml"
+  pull_request:
+    paths:
+      - "enterprise-endpoint-toolkit/**"
+      - ".github/workflows/endpoint-toolkit-ci.yml"
+permissions:
+  contents: read
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install package
+        run: python -m pip install ./enterprise-endpoint-toolkit
+      - name: Unit tests
+        run: python -m unittest discover -s enterprise-endpoint-toolkit/tests -p "test_*.py" -v
+      - name: Demo report smoke test
+        run: |
+          endpoint-toolkit demo --out /tmp/endpoint-report
+          test -s /tmp/endpoint-report/dashboard.html
+          test -s /tmp/endpoint-report/report.json
+  powershell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Pester and test
+        shell: pwsh
+        run: |
+          Install-Module Pester -MinimumVersion 5.5.0 -Scope CurrentUser -Force -SkipPublisherCheck
+          Import-Module Pester -MinimumVersion 5.5.0
+          Invoke-Pester ./enterprise-endpoint-toolkit/tests/EndpointToolkit.Tests.ps1 -CI
